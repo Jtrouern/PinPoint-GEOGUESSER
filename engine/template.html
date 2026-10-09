@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<!--
+  PINPOINT: a GeoSense-style map game, generalized
+  ==================================================================
+  This file is BUILT. Do not edit it by hand: edit the engine
+  template (engine/template.html) or a map pack (packs/*.json),
+  then run `python3 tools/build.py`. See README.md.
+
+  PUBLIC DOMAIN DEDICATION (game code)
+  ------------------------------------------------------------------
+  To the extent possible under law, Jonathan Trouern-Trend has
+  waived all copyright and related rights to the Pinpoint engine,
+  build tools, and the hand-compiled place lists. CC0 1.0 Universal:
+  https://creativecommons.org/publicdomain/zero/1.0/
+
+  THIRD-PARTY MATERIAL keeps its own terms. Each map pack lists its
+  sources in its "credits" field; they are collected and shown on
+  the start screen. D3 and topojson-client (ISC) load from CDNs.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pinpoint</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* CUSTOMIZE: colors and fonts. Light theme first; the dark theme below is
+   used automatically when the visitor's device is in dark mode. */
+:root{
+  --sea:#cfe0dc; --land:#efe5cf; --coast:#6b7a7d; --border:#b9ad93;
+  --ink:#1f3440; --ink-soft:#56666c; --paper:#f6f1e4; --guess:#b3372b; --truth:#1f3440;
+  --line:#b3372b; --panel:rgba(246,241,228,.94); --rule:#d6ccb4; --good:#2f6b4f;
+  --serif:"IM Fell English", "Iowan Old Style", Georgia, serif;
+  --sans:"Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --sea:#142830; --land:#2d3431; --coast:#7b8d8e; --border:#4a524d;
+    --ink:#e8e2d2; --ink-soft:#a5aca6; --paper:#1a2226; --guess:#e0675a; --truth:#f2e7c8;
+    --line:#e0675a; --panel:rgba(22,30,34,.94); --rule:#3a4540; --good:#7cc3a0;
+  }
+}
+:root[data-theme="dark"]{
+  --sea:#142830; --land:#2d3431; --coast:#7b8d8e; --border:#4a524d;
+  --ink:#e8e2d2; --ink-soft:#a5aca6; --paper:#1a2226; --guess:#e0675a; --truth:#f2e7c8;
+  --line:#e0675a; --panel:rgba(22,30,34,.94); --rule:#3a4540; --good:#7cc3a0;
+}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%}
+body{margin:0;height:100%;background:var(--sea);color:var(--ink);font-family:var(--sans);font-size:16px;overflow:hidden;-webkit-tap-highlight-color:transparent}
+#app{position:relative;height:100%;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:1.25rem;padding:.6rem 1rem;background:var(--paper);border-bottom:1px solid var(--rule);z-index:3}
+.brand{font-family:var(--serif);font-size:1.45rem;line-height:1;white-space:nowrap;cursor:pointer}
+.brand i{color:var(--guess);font-style:normal}
+.stats{display:flex;gap:1.4rem;margin-left:auto;font-size:.85rem;color:var(--ink-soft)}
+.stats b{display:block;color:var(--ink);font-size:1.15rem;font-weight:600;font-variant-numeric:tabular-nums}
+#timer{height:4px;background:var(--rule);z-index:3}
+#timerFill{height:100%;width:100%;background:var(--guess);transform-origin:left;transform:scaleX(1)}
+#stage{position:relative;flex:1;min-height:0}
+svg{display:block;width:100%;height:100%;cursor:crosshair;touch-action:manipulation}
+.land{fill:var(--land);stroke:var(--border);stroke-width:.5}
+.borders{fill:none;stroke:var(--coast);stroke-width:.7}
+.grat{fill:none;stroke:var(--ink);stroke-opacity:.07;stroke-width:.6}
+.sphere{fill:var(--sea)}
+.track{fill:none;stroke:var(--line);stroke-width:1.6;stroke-dasharray:5 4}
+.target{fill:var(--guess);fill-opacity:.18;stroke:var(--guess);stroke-width:1.5}
+.targetLine{fill:none;stroke:var(--guess);stroke-opacity:.35;stroke-linecap:round;stroke-linejoin:round}
+.ring{fill:none;stroke:var(--truth);stroke-width:1.2;opacity:.55}
+.guessDot{fill:var(--guess);stroke:var(--paper);stroke-width:2}
+.trueDot{fill:var(--truth);stroke:var(--paper);stroke-width:2}
+.pinLabel{font-family:var(--serif);font-size:15px;fill:var(--ink);paint-order:stroke;stroke:var(--sea);stroke-width:4px;stroke-linejoin:round}
+@media (prefers-reduced-motion:no-preference){ .ring{animation:pulse 1.2s ease-out} @keyframes pulse{from{r:2;opacity:1}} }
+#cartouche{position:absolute;left:1rem;top:1rem;max-width:min(30rem,calc(100% - 2rem));background:var(--panel);border:1px solid var(--rule);padding:.8rem 1.1rem .9rem;pointer-events:none;box-shadow:3px 3px 0 var(--rule)}
+#cartouche .q{font-size:.8rem;color:var(--ink-soft)}
+#place{font-family:var(--serif);font-size:clamp(1.6rem,4.5vw,2.6rem);line-height:1.05;margin-top:.1rem}
+#result{margin-top:.45rem;font-size:.95rem;min-height:1.4em;font-variant-numeric:tabular-nums}
+#result .pts{color:var(--good);font-weight:600}
+#result .miss{color:var(--guess);font-weight:600}
+#hint{position:absolute;right:1rem;bottom:1rem;font-size:.8rem;color:var(--ink-soft);background:var(--panel);padding:.35rem .6rem;border:1px solid var(--rule)}
+.screen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:1rem;background:color-mix(in srgb,var(--sea) 55%,transparent);z-index:5;overflow:auto}
+.screen[hidden]{display:none}
+.card{background:var(--paper);border:1px solid var(--rule);box-shadow:5px 5px 0 var(--rule);padding:1.6rem 1.7rem 1.5rem;width:min(46rem,100%);max-height:100%;overflow:auto}
+#endScreen .card{width:min(34rem,100%)}
+.card h1{font-family:var(--serif);font-weight:400;font-size:clamp(2rem,6vw,2.8rem);line-height:1;margin:0 0 .5rem}
+.card p{margin:.25rem 0 1.1rem;color:var(--ink-soft);line-height:1.5;max-width:62ch}
+.maps{display:grid;grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));gap:.6rem}
+.maps button{all:unset;cursor:pointer;border:1px solid var(--rule);padding:.8rem .9rem;background:var(--sea);transition:border-color .15s}
+.maps button:hover{border-color:var(--ink)}
+.maps button:focus-visible,.btn:focus-visible{outline:2px solid var(--guess);outline-offset:2px}
+.maps .t{font-family:var(--serif);font-size:1.35rem;display:block}
+.maps .s{font-size:.8rem;color:var(--ink-soft)}
+.credits{font-size:.72rem;color:var(--ink-soft);margin:1rem 0 0;line-height:1.5}
+.credits a{color:inherit}
+.btn{font:inherit;font-weight:600;cursor:pointer;background:var(--ink);color:var(--paper);border:0;padding:.7rem 1.2rem;margin-right:.5rem;margin-top:.4rem}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--rule)}
+.final{font-family:var(--serif);font-size:3.6rem;line-height:1;margin:.3rem 0 .2rem;font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-size:.88rem;margin:1rem 0;font-variant-numeric:tabular-nums}
+td{padding:.32rem 0;border-bottom:1px solid var(--rule)}
+td:nth-child(2),td:nth-child(3){text-align:right;color:var(--ink-soft);white-space:nowrap;padding-left:.8rem}
+td:nth-child(3){color:var(--ink);font-weight:600}
+.new{color:var(--good);font-weight:600}
+@media (max-width:560px){ .stats{gap:.9rem} .stats .hide-s{display:none} .brand{font-size:1.2rem} #hint{display:none} }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand" id="brand" title="Back to the map list">Pin<i>•</i>point</div>
+    <div class="stats">
+      <div class="hide-s">Map<b id="sMap">—</b></div>
+      <div>Round<b id="sRound">—</b></div>
+      <div>Score<b id="sScore">0</b></div>
+    </div>
+  </header>
+  <div id="timer"><div id="timerFill"></div></div>
+  <div id="stage">
+    <svg id="map" role="img" aria-label="Blank map. Click where you think the named place is."></svg>
+    <div id="cartouche" hidden>
+      <div class="q" id="question">Where is</div>
+      <div id="place"></div>
+      <div id="result" aria-live="polite"></div>
+    </div>
+    <div id="hint" hidden>Space or Enter skips to the next place</div>
+    <section class="screen" id="startScreen">
+      <div class="card">
+        <h1>Pinpoint</h1>
+        <p id="intro"></p>
+        <div class="maps" id="mapButtons"></div>
+        <p class="credits" id="credits"></p>
+      </div>
+    </section>
+    <section class="screen" id="endScreen" hidden>
+      <div class="card">
+        <div id="endMap" style="color:var(--ink-soft)"></div>
+        <div class="final" id="endScore"></div>
+        <div id="endBest"></div>
+        <table id="endTable"></table>
+        <button class="btn" id="againBtn">Play this map again</button>
+        <button class="btn ghost" id="menuBtn">Choose another map</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script>
+/* ---- Data, inserted by tools/build.py ----------------------------------
+   GEO    outline files, keyed by name (TopoJSON or GeoJSON)
+   PACKS  map packs, in start-screen order (see README for the format)  */
+const GEO=/*GEO*/{};
+const PACKS=/*PACKS*/[];
+
+/* CUSTOMIZE: defaults every pack inherits unless it sets its own. */
+const DEFAULTS={rounds:10, seconds:10, revealMs:2600, scale:1000};
+/* Prompt wording for place kinds that read oddly on their own
+   ("Where is this park?" -> "national park"). Packs can add "words". */
+const WORDS={park:"national park",islands:"island group",state:"state",city:"city",town:"town"};
+
+/* ===================== engine (no per-map code below) ===================== */
+const svg=d3.select("#map"), gMap=svg.append("g"), gMarks=svg.append("g");
+let pack=null, proj=null, path=null, deck=[], round=0, score=0, log=[];
+let phase="idle", t0=0, raf=0, revealTimer=0;
+const cfg=k=>pack&&pack[k]!=null?pack[k]:DEFAULTS[k];
+const fmt=n=>n.toLocaleString("en-US");
+
+function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
+const best=id=>+store("pinpoint-best-"+id)||0;
+
+// ---- geodata helpers: accept TopoJSON or GeoJSON transparently ----
+const featCache=new Map();
+function features(key,object){
+  const ck=key+"|"+(object||"");
+  if(featCache.has(ck)) return featCache.get(ck);
+  const g=GEO[key]; if(!g) throw new Error(`Map pack uses geo "${key}", which is not in the build`);
+  let fc;
+  if(g.type==="Topology"){ const o=object||Object.keys(g.objects)[0]; fc=topojson.feature(g,g.objects[o]); }
+  else fc=g.type==="FeatureCollection"?g:{type:"FeatureCollection",features:[g]};
+  const feats=fc.features||[fc]; featCache.set(ck,feats); return feats;
+}
+function interiorMesh(key,object){
+  const g=GEO[key]; if(g.type!=="Topology") return null;
+  const o=object||Object.keys(g.objects)[0];
+  return topojson.mesh(g,g.objects[o],(a,b)=>a!==b);
+}
+const nameOf=(f,prop)=>f.properties?.[prop||"name"] ?? f.id;
+
+// ---- pools -> playable items ----
+function poolItems(name){
+  const pool=pack.pools[name]; if(!pool) return [];
+  const word=pool.word||name;
+  if(pool.regions){
+    const r=pool.regions; let fs=features(r.geo,r.object);
+    if(r.where){ const w=r.where; fs=fs.filter(f=>{const v=String(f.properties?.[w.prop]??f.id);
+      return (w.startsWith?[].concat(w.startsWith).some(s=>v.startsWith(s)):true)&&(w.in?w.in.map(String).includes(v):true)})}
+    if(r.exclude) fs=fs.filter(f=>!r.exclude.includes(nameOf(f,r.nameProp)));
+    return fs.map(f=>{const n=nameOf(f,r.nameProp);
+      return {n, k:word, geo:f, w:(r.words&&r.words[n])||(r.wordProp&&f.properties?.[r.wordProp])||null}});
+  }
+  return (pool.items||[]).map(x=>Array.isArray(x)?{n:x[0],k:word,p:[[x[1],x[2]]],r:0}:{k:word,r:0,...x});
+}
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a}
+function buildDeck(){
+  const n=cfg("rounds"), mix=pack.mix||Object.fromEntries(Object.keys(pack.pools).map(k=>[k,0]));
+  const all=Object.keys(mix).map(k=>shuffle(poolItems(k)));
+  let picked=[]; Object.values(mix).forEach((c,i)=>{picked.push(...all[i].splice(0,c))});
+  const rest=shuffle(all.flat()); while(picked.length<n&&rest.length) picked.push(rest.pop());
+  return shuffle(picked.slice(0,n));
+}
+
+// ---- drawing ----
+function makeProjection(W,H,pad){
+  const v=pack.view||{}, top=pad+(W<600?110:0), box=[[pad,top],[W-pad,H-pad]];
+  const P={naturalEarth1:d3.geoNaturalEarth1,albersUsa:d3.geoAlbersUsa,conicConformal:d3.geoConicConformal,
+           conicEqualArea:d3.geoConicEqualArea,mercator:d3.geoMercator,equirectangular:d3.geoEquirectangular};
+  const fr=v.frame;
+  const kind=v.projection||(fr?"conicConformal":"naturalEarth1");
+  const p=(P[kind]||d3.geoNaturalEarth1)();
+  if(kind!=="albersUsa"){
+    if(v.rotate) p.rotate(v.rotate); else if(fr) p.rotate([-(fr[0][0]+fr[1][0])/2,0]);
+    if(p.parallels){ if(v.parallels) p.parallels(v.parallels);
+      else if(fr){const [s,n]=[fr[0][1],fr[1][1]];p.parallels([s+(n-s)/4,n-(n-s)/4])} }
+  }
+  let target;
+  if(fr){const [[w,s],[e,n]]=fr,pts=[];for(let i=0;i<=4;i++){const x=w+(e-w)*i/4,y=s+(n-s)*i/4;pts.push([x,s],[x,n],[w,y],[e,y])}
+    target={type:"MultiPoint",coordinates:pts};}
+  else if(v.fit==="sphere"||kind==="naturalEarth1") target={type:"Sphere"};
+  else { const ls=pack.layers||defaultLayers(), L=ls.find(l=>l.fit)||ls.find(l=>l.style==="land");
+    target={type:"FeatureCollection",features:features(L.geo,L.object)}; }
+  return p.fitExtent(box,target);
+}
+function defaultLayers(){
+  const L=[]; if(GEO.world) L.push({geo:"world",style:"context"});
+  for(const pl of Object.values(pack.pools)) if(pl.regions) L.push({geo:pl.regions.geo,object:pl.regions.object,style:"land"},{geo:pl.regions.geo,object:pl.regions.object,style:"borders"});
+  return L;
+}
+function draw(){
+  const box=svg.node().getBoundingClientRect(), W=box.width, H=box.height, pad=Math.min(W,H)*.04;
+  svg.attr("viewBox",`0 0 ${W} ${H}`); gMap.selectAll("*").remove();
+  if(!pack){ pack=PACKS[0]; }  // background map behind the start screen
+  proj=makeProjection(W,H,pad); path=d3.geoPath(proj);
+  gMap.append("rect").attr("width",W).attr("height",H).attr("class","sphere");
+  if((pack.view||{}).graticule!==false && pack.view?.projection!=="albersUsa")
+    gMap.append("path").datum(d3.geoGraticule10()).attr("class","grat").attr("d",path);
+  for(const l of (pack.layers||defaultLayers())){
+    if(l.style==="borders"){ const m=interiorMesh(l.geo,l.object); if(m) gMap.append("path").datum(m).attr("class","borders").attr("d",path).style("stroke-width",l.width??.7); continue; }
+    const g=gMap.append("g").selectAll("path").data(features(l.geo,l.object)).join("path").attr("class","land").attr("d",path);
+    if(l.style==="context") g.style("opacity",.5);
+    if(l.width!=null) g.style("stroke-width",l.width);
+    if(l.focus) g.style("opacity",f=>l.focus.includes(nameOf(f,l.nameProp))?1:.5);
+  }
+  if(phase==="reveal"&&log.length) showReveal(log[log.length-1]);
+}
+
+// ---- distance & scoring ----
+function haversine(a,b){ const R=3958.8,r=Math.PI/180,dLat=(b[1]-a[1])*r,dLon=(b[0]-a[0])*r;
+  const h=Math.sin(dLat/2)**2+Math.cos(a[1]*r)*Math.cos(b[1]*r)*Math.sin(dLon/2)**2; return 2*R*Math.asin(Math.min(1,Math.sqrt(h))); }
+function verts(f){const out=[];(function walk(c){typeof c[0]==="number"?out.push(c):c.forEach(walk)})(f.geometry.coordinates);return out}
+function measure(item,guess){
+  if(item.geo){
+    if(d3.geoContains(item.geo,guess)) return {dist:0,near:null};
+    let best=Infinity,near=null;for(const v of verts(item.geo)){const d=haversine(guess,v);if(d<best){best=d;near=v}}
+    return {dist:best,near};
+  }
+  let best=Infinity,near=null;
+  for(const [la,lo] of item.p){const d=haversine(guess,[lo,la]);if(d<best){best=d;near=[lo,la]}}
+  for(let i=0;i<item.p.length-1;i++){const a=[item.p[i][1],item.p[i][0]],b=[item.p[i+1][1],item.p[i+1][0]],ip=d3.geoInterpolate(a,b);
+    for(let s=1;s<10;s++){const q=ip(s/10),d=haversine(guess,q);if(d<best){best=d;near=q}}}
+  const dist=Math.max(0,best-(item.r||0)); return {dist,near:dist===0?null:near};
+}
+
+// ---- game flow ----
+function start(p){
+  pack=p; score=0; round=0; log=[]; deck=buildDeck();
+  d3.selectAll("#startScreen,#endScreen").attr("hidden",true);
+  d3.selectAll("#cartouche,#hint").attr("hidden",null);
+  d3.select("#sMap").text(p.title); draw(); next();
+}
+function next(){
+  clearTimeout(revealTimer); gMarks.selectAll("*").remove();
+  if(round>=deck.length) return finish();
+  const c=deck[round]; round++;
+  d3.select("#sRound").text(`${round} / ${deck.length}`); d3.select("#sScore").text(fmt(score));
+  const word=c.w||(pack.words||{})[c.k]||WORDS[c.k]||c.k;
+  d3.select("#question").text(word?`Where is this ${word}?`:"Where is");
+  d3.select("#place").text(c.n); d3.select("#result").html("&nbsp;");
+  phase="play"; t0=performance.now(); tick();
+}
+function tick(){
+  const left=Math.max(0,1-(performance.now()-t0)/(cfg("seconds")*1000));
+  d3.select("#timerFill").style("transform",`scaleX(${left})`);
+  if(phase!=="play") return; if(left<=0) return resolve(null); raf=requestAnimationFrame(tick);
+}
+function resolve(guess){
+  cancelAnimationFrame(raf); phase="reveal";
+  const c=deck[round-1], secs=cfg("seconds"), elapsed=Math.min(secs,(performance.now()-t0)/1000);
+  let dist=null,near=null,pts=0;
+  if(guess){ ({dist,near}=measure(c,guess));
+    const acc=Math.max(0,1-dist/cfg("scale")), speed=.5+.5*(1-elapsed/secs);
+    pts=Math.round(1000*acc*acc*speed); }   // squared accuracy rewards precision
+  score+=pts; const e={name:c.n,item:c,guess,dist,near,pts}; log.push(e);
+  d3.select("#sScore").text(fmt(score)); showReveal(e);
+  revealTimer=setTimeout(next,cfg("revealMs"));
+}
+function showReveal(e){
+  gMarks.selectAll("*").remove(); const it=e.item; let anchor, dot=false;
+  if(it.geo){ gMarks.append("path").datum(it.geo).attr("class","target").attr("d",path); anchor=d3.geoCentroid(it.geo); }
+  else if(it.p.length>1){
+    const line={type:"LineString",coordinates:it.p.map(([la,lo])=>[lo,la])}; anchor=line.coordinates[line.coordinates.length>>1];
+    const a=proj(anchor),b=proj([anchor[0],anchor[1]+1]), pxPerMile=a&&b?Math.hypot(a[0]-b[0],a[1]-b[1])/69:0;
+    gMarks.append("path").datum(line).attr("class","targetLine").attr("d",path).style("stroke-width",Math.max(6,2*(it.r||0)*pxPerMile));
+  } else { anchor=[it.p[0][1],it.p[0][0]];
+    if(it.r>0) gMarks.append("path").datum(d3.geoCircle().center(anchor).radius(it.r/69.05)()).attr("class","target").attr("d",path);
+    else dot=true; }
+  if(e.guess){ const G=proj(e.guess);
+    if(e.near) gMarks.append("path").datum({type:"LineString",coordinates:[e.guess,e.near]}).attr("class","track").attr("d",path);
+    if(G) gMarks.append("circle").attr("class","guessDot").attr("cx",G[0]).attr("cy",G[1]).attr("r",6); }
+  const T=proj(anchor);
+  if(T){ if(dot){ gMarks.append("circle").attr("class","ring").attr("cx",T[0]).attr("cy",T[1]).attr("r",16);
+      gMarks.append("circle").attr("class","trueDot").attr("cx",T[0]).attr("cy",T[1]).attr("r",6); }
+    const W=svg.node().getBoundingClientRect().width, left=T[0]>W-170;
+    gMarks.append("text").attr("class","pinLabel").attr("x",T[0]+(left?-12:12)).attr("y",T[1]+5)
+      .attr("text-anchor",left?"end":"start").text(e.name.split(",")[0]); }
+  d3.select("#result").html(e.guess?(e.dist===0?"Right on target":`${fmt(Math.round(e.dist))} miles off`)+` &nbsp;<span class="pts">+${fmt(e.pts)}</span>`
+    :`<span class="miss">Out of time</span> &nbsp;+0`);
+}
+function finish(){
+  phase="idle"; gMarks.selectAll("*").remove(); d3.selectAll("#cartouche,#hint").attr("hidden",true);
+  const prev=best(pack.id), isBest=score>prev; if(isBest) store("pinpoint-best-"+pack.id,score);
+  d3.select("#endMap").text(`${pack.title}: final score`); d3.select("#endScore").text(fmt(score));
+  d3.select("#endBest").html(isBest?`<span class="new">New best on this map</span>${prev?` (previous ${fmt(prev)})`:""}`:`Your best here is ${fmt(prev)}`);
+  d3.select("#endTable").html(log.map(e=>`<tr><td>${esc(e.name)}</td><td>${e.guess?(e.dist===0?"on target":fmt(Math.round(e.dist))+" mi"):"no guess"}</td><td>${fmt(e.pts)}</td></tr>`).join(""));
+  d3.select("#endScreen").attr("hidden",null); d3.select("#againBtn").node().focus();
+}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function menu(){
+  phase="idle"; clearTimeout(revealTimer); cancelAnimationFrame(raf); gMarks.selectAll("*").remove();
+  d3.selectAll("#endScreen,#cartouche,#hint").attr("hidden",true);
+  d3.select("#sRound").text("—"); d3.select("#sScore").text("0"); d3.select("#sMap").text("—");
+  d3.select("#timerFill").style("transform","scaleX(1)");
+  d3.select("#intro").text(`Pick a map. You'll get ${DEFAULTS.rounds} places, one at a time. Click where you think each one is. Closer, faster guesses score more, up to 1,000 points each.`);
+  const btns=d3.select("#mapButtons").html("");
+  PACKS.forEach(p=>{ const b=best(p.id);
+    btns.append("button").attr("type","button").html(`<span class="t">${esc(p.title)}</span><span class="s">${esc(p.sub||"")}${b?`<br>Best: ${fmt(b)}`:""}</span>`).on("click",()=>start(p)); });
+  const credits=[...new Set(PACKS.flatMap(p=>[].concat(p.credits||[])))];
+  d3.select("#credits").html("Data: "+credits.join(" · ")+". Game code is public domain (<a href=\"https://creativecommons.org/publicdomain/zero/1.0/\">CC0</a>).");
+  d3.select("#startScreen").attr("hidden",null);
+}
+svg.on("click",ev=>{ if(phase!=="play") return;
+  const ll=proj.invert(d3.pointer(ev,svg.node()));
+  if(!ll||!isFinite(ll[0])||!isFinite(ll[1])||Math.abs(ll[0])>180||Math.abs(ll[1])>90) return; resolve(ll); });
+document.addEventListener("keydown",ev=>{ if(phase==="reveal"&&(ev.key===" "||ev.key==="Enter")){ev.preventDefault();next();} });
+d3.select("#againBtn").on("click",()=>start(pack)); d3.select("#menuBtn").on("click",menu); d3.select("#brand").on("click",menu);
+let rt; window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(draw,120)});
+draw(); menu();
+</script>
+</body>
+</html>

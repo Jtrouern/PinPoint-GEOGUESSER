@@ -1,0 +1,27 @@
+{
+  "_notes": "Same outline file as US Counties, filtered with regions.where to six states. Copy this pattern for any state or group of states.",
+  "id": "new-england-counties",
+  "title": "New England Counties",
+  "sub": "67 counties from Fairfield to Aroostook",
+  "scale": 120,
+  "credits": ["US Census Bureau via us-atlas (public domain)", "Natural Earth (public domain)"],
+  "view": {
+    "frame": [
+      [-73.8, 40.9],
+      [-66.8, 47.5]
+    ],
+    "projection": "conicConformal"
+  },
+  "layers": [
+    {"geo": "world", "object": "countries", "style": "context"},
+    {"geo": "us-counties", "object": "counties", "style": "land", "width": 0.3},
+    {"geo": "us-counties", "object": "states", "style": "borders", "width": 1.1}
+  ],
+  "pools": {
+    "counties": {
+      "word": "county",
+      "regions": {"geo": "us-counties", "object": "counties", "nameProp": "label", "wordProp": "word", "where": {"prop": "state", "in": ["CT", "RI", "MA", "VT", "NH", "ME"]}}
+    }
+  },
+  "mix": {"counties": 10}
+}

@@ -1,0 +1,20 @@
+{
+  "_notes": "Outlines prepared by tools/prep_us_counties.py. All ~3,100 counties; deliberately hard.",
+  "id": "us-counties",
+  "title": "US Counties",
+  "sub": "Any of 3,100 counties, parishes and boroughs. Hard.",
+  "scale": 400,
+  "credits": ["US Census Bureau via us-atlas (public domain)"],
+  "view": {"projection": "albersUsa"},
+  "layers": [
+    {"geo": "us-counties", "object": "counties", "style": "land", "width": 0.2},
+    {"geo": "us-counties", "object": "states", "style": "borders", "width": 0.9}
+  ],
+  "pools": {
+    "counties": {
+      "word": "county",
+      "regions": {"geo": "us-counties", "object": "counties", "nameProp": "label", "wordProp": "word"}
+    }
+  },
+  "mix": {"counties": 10}
+}
