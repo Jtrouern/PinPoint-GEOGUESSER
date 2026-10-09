@@ -6,12 +6,12 @@
   template (engine/template.html) or a map pack (packs/*.json),
   then run `python3 tools/build.py`. See README.md.
 
-  PUBLIC DOMAIN DEDICATION (game code)
+  LICENSE (game code)
   ------------------------------------------------------------------
-  To the extent possible under law, Jonathan Trouern-Trend has
-  waived all copyright and related rights to the Pinpoint engine,
-  build tools, and the hand-compiled place lists. CC0 1.0 Universal:
-  https://creativecommons.org/publicdomain/zero/1.0/
+  The Pinpoint engine, build tools, and hand-compiled place lists are
+  released under the MIT License. Copyright (c) 2026 Jtrouern.
+  Full text: LICENSE in https://github.com/Jtrouern/PinPoint-GEOGUESSER
+  Keep this notice in copies or substantial portions of the code.
 
   THIRD-PARTY MATERIAL keeps its own terms. Each map pack lists its
   sources in its "credits" field; they are collected and shown on
@@ -346,7 +346,7 @@ function menu(){
   PACKS.forEach(p=>{ const b=best(p.id);
     btns.append("button").attr("type","button").html(`<span class="t">${esc(p.title)}</span><span class="s">${esc(p.sub||"")}${b?`<br>Best: ${fmt(b)}`:""}</span>`).on("click",()=>start(p)); });
   const credits=[...new Set(PACKS.flatMap(p=>[].concat(p.credits||[])))];
-  d3.select("#credits").html("Data: "+credits.join(" · ")+". Game code is public domain (<a href=\"https://creativecommons.org/publicdomain/zero/1.0/\">CC0</a>).");
+  d3.select("#credits").html("Data: "+credits.join(" · ")+". Game code: <a href=\"https://github.com/Jtrouern/PinPoint-GEOGUESSER\">MIT License</a>.");
   d3.select("#startScreen").attr("hidden",null);
 }
 svg.on("click",ev=>{ if(phase!=="play") return;

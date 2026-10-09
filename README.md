@@ -196,7 +196,7 @@ India's boundaries follow Natural Earth's de facto lines, which differ from the 
 
 ## License
 
-**Public domain:** the engine, the build tools, and the hand-compiled place lists (Australian and Queensland towns and features, extra Mexican towns, Indian capitals added by hand) are dedicated to the public domain under [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/). Copy, modify and redistribute them for any purpose without asking.
+**MIT License:** the engine, the build tools, and the hand-compiled place lists (Australian and Queensland towns and features, extra Mexican towns, Indian capitals added by hand) are released under the [MIT License](LICENSE). Anyone may use, copy, modify and redistribute them, including commercially, as long as the copyright and license notice stay with the code.
 
 **Third-party material keeps its own terms:**
 
